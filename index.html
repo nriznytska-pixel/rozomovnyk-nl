@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#FF6B00">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Розмовник NL">
+    <title>Швидкий розмовник NL 🇺🇦🇳🇱</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#FF6B00',
+                        cream: '#FFF9F0',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        * { -webkit-tap-highlight-color: transparent; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+    </style>
+</head>
+<body class="bg-cream min-h-screen pb-20">
+    
+    <!-- HOME TAB -->
+    <div id="home-tab" class="tab-content active p-4 max-w-lg mx-auto">
+        <div class="text-center mb-6 pt-4">
+            <h1 class="text-2xl font-bold text-gray-800">Привіт! 👋</h1>
+            <p class="text-gray-600 mt-1">Що будемо вчити сьогодні?</p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 mb-6">
+            <div onclick="APP.showTab('expressions')" class="cursor-pointer">
+                <div class="bg-primary rounded-2xl p-5 text-white shadow-lg">
+                    <div class="text-3xl mb-2">💬</div>
+                    <h2 class="text-lg font-bold">Нідерландські Вирази</h2>
+                    <p class="text-sm opacity-90 mt-1">460+ ідіом →</p>
+                </div>
+            </div>
+            
+            <div onclick="APP.showTab('phrasebook')" class="cursor-pointer">
+                <div class="bg-white border-2 border-primary rounded-2xl p-5">
+                    <div class="text-3xl mb-2">📖</div>
+                    <h2 class="text-lg font-bold text-primary">Розмовник</h2>
+                    <p class="text-sm text-gray-600 mt-1">500+ фраз →</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl p-5 shadow-md mb-6">
+            <span class="bg-primary text-white text-xs font-semibold px-2 py-1 rounded-full">ВИРАЗ ДНЯ</span>
+            <div id="daily-expression" class="mt-3">
+                <div class="animate-pulse">
+                    <div class="h-6 bg-gray-200 rounded w-3/4 mb-2"></div>
+                    <div class="h-4 bg-gray-200 rounded w-1/2"></div>
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <h2 class="text-lg font-semibold text-gray-800 mb-3">🔥 Популярні категорії</h2>
+            <div class="grid grid-cols-3 gap-3">
+                <div onclick="APP.goToCategory('Медицина')" class="cursor-pointer bg-white rounded-xl p-3 text-center shadow-sm">
+                    <div class="text-2xl mb-1">🏥</div>
+                    <p class="text-xs text-gray-700">Медицина</p>
+                </div>
+                <div onclick="APP.goToCategory('Міграційна служба')" class="cursor-pointer bg-white rounded-xl p-3 text-center shadow-sm">
+                    <div class="text-2xl mb-1">🛂</div>
+                    <p class="text-xs text-gray-700">IND</p>
+                </div>
+                <div onclick="APP.goToCategory('Кризова допомога')" class="cursor-pointer bg-white rounded-xl p-3 text-center shadow-sm">
+                    <div class="text-2xl mb-1">🆘</div>
+                    <p class="text-xs text-gray-700">Кризова</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- EXPRESSIONS TAB -->
+    <div id="expressions-tab" class="tab-content p-4 max-w-lg mx-auto">
+        <div class="flex items-center gap-3 mb-4 pt-2">
+            <button onclick="APP.backToExprCategories()" id="expr-back" class="text-primary hidden">←</button>
+            <h1 class="text-xl font-bold text-gray-800" id="expr-title">Вирази</h1>
+        </div>
+        <input type="text" id="expr-search" placeholder="🔍 Пошук..." oninput="APP.searchExpr()"
+            class="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 mb-4">
+        <div id="expr-content"></div>
+    </div>
+
+    <!-- PHRASEBOOK TAB -->
+    <div id="phrasebook-tab" class="tab-content p-4 max-w-lg mx-auto">
+        <div class="flex items-center gap-3 mb-4 pt-2">
+            <button onclick="APP.backToPhraseCategories()" id="phrase-back" class="text-primary hidden">←</button>
+            <h1 class="text-xl font-bold text-gray-800" id="phrase-title">Розмовник</h1>
+        </div>
+        <input type="text" id="phrase-search" placeholder="🔍 Пошук..." oninput="APP.searchPhrase()"
+            class="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 mb-4">
+        <div id="phrase-content"></div>
+    </div>
+
+    <!-- PROFILE TAB -->
+    <div id="profile-tab" class="tab-content p-4 max-w-lg mx-auto">
+        <h1 class="text-xl font-bold text-gray-800 pt-2 mb-6">Профіль</h1>
+        <div class="bg-gray-900 rounded-2xl p-5 text-white mb-6">
+            <div class="flex items-center gap-4">
+                <div class="w-14 h-14 bg-primary rounded-full flex items-center justify-center text-xl font-bold">UA</div>
+                <div>
+                    <h2 class="font-semibold text-lg">Гість</h2>
+                    <p class="text-gray-400 text-sm">Безкоштовний план</p>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl overflow-hidden shadow-sm">
+            <a href="https://empatia.nl" target="_blank" class="flex items-center gap-4 p-4 border-b">
+                <span class="text-2xl">💙</span>
+                <span class="text-gray-800">Empatia - підтримка</span>
+            </a>
+            <a href="tel:112" class="flex items-center gap-4 p-4">
+                <span class="text-2xl">🆘</span>
+                <span class="text-gray-800">Екстрена допомога: 112</span>
+            </a>
+        </div>
+        <p class="text-center mt-8 text-gray-400 text-sm">💙💛 Для українців у Нідерландах</p>
+    </div>
+
+    <!-- BOTTOM NAV -->
+    <nav class="fixed bottom-0 left-0 right-0 bg-white border-t px-4 py-2">
+        <div class="max-w-lg mx-auto flex justify-around">
+            <div onclick="APP.showTab('home')" id="nav-home" class="cursor-pointer text-center text-primary">
+                <div class="text-xl">🏠</div>
+                <div class="text-xs font-semibold">Головна</div>
+            </div>
+            <div onclick="APP.showTab('expressions')" id="nav-expressions" class="cursor-pointer text-center text-gray-500">
+                <div class="text-xl">💬</div>
+                <div class="text-xs">Вирази</div>
+            </div>
+            <div onclick="APP.showTab('phrasebook')" id="nav-phrasebook" class="cursor-pointer text-center text-gray-500">
+                <div class="text-xl">📖</div>
+                <div class="text-xs">Розмовник</div>
+            </div>
+            <div onclick="APP.showTab('profile')" id="nav-profile" class="cursor-pointer text-center text-gray-500">
+                <div class="text-xl">👤</div>
+                <div class="text-xs">Профіль</div>
+            </div>
+        </div>
+    </nav>
+
+    <script>
+    var APP = (function() {
+        var db = window.supabase.createClient(
+            'https://akvfcemyrkadonbaghsf.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFrdmZjZW15cmthZG9uYmFnaHNmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcyNjU4MTQsImV4cCI6MjA4Mjg0MTgxNH0.rxBWHMl8X8m3-U1gbGG-gX9gjPvnqUzBqWDI0a9RGiI'
+        );
+        
+        var expressions = [];
+        var phrases = [];
+        var currentExprCat = null;
+        var currentPhraseCat = null;
+        
+        var emojis = {
+            'Медицина': '🏥', 'Міграційна служба': '🛂', 'Кризова допомога': '🆘',
+            'Похорони': '⚰️', 'Я не розумію': '🤷', 'Робота': '💼', 'Їжа': '🍽️',
+            'Освіта': '🎓', 'Образи та відповіді': '🛡️'
+        };
+
+        function showTab(name) {
+            document.querySelectorAll('.tab-content').forEach(function(t) { t.classList.remove('active'); });
+            document.getElementById(name + '-tab').classList.add('active');
+            
+            ['home','expressions','phrasebook','profile'].forEach(function(n) {
+                var el = document.getElementById('nav-' + n);
+                if (n === name) {
+                    el.className = 'cursor-pointer text-center text-primary';
+                    el.querySelector('div:last-child').className = 'text-xs font-semibold';
+                } else {
+                    el.className = 'cursor-pointer text-center text-gray-500';
+                    el.querySelector('div:last-child').className = 'text-xs';
+                }
+            });
+
+            if (name === 'expressions' && expressions.length === 0) loadExpressions();
+            if (name === 'phrasebook' && phrases.length === 0) loadPhrases();
+        }
+
+        function loadDaily() {
+            db.from('expressions').select('*').limit(50).then(function(res) {
+                if (res.data && res.data.length > 0) {
+                    var r = res.data[Math.floor(Math.random() * res.data.length)];
+                    document.getElementById('daily-expression').innerHTML = 
+                        '<div class="flex justify-between items-start">' +
+                        '<div><h3 class="text-lg font-semibold">' + r.dutch_expression + '</h3>' +
+                        '<p class="text-gray-600 mt-1">' + r.ukrainian_translation + '</p></div>' +
+                        '<button onclick="APP.speak(\'' + r.dutch_expression.replace(/'/g, "\\'") + '\')" class="p-2 bg-orange-100 rounded-full">🔊</button></div>';
+                }
+            });
+        }
+
+        function loadExpressions() {
+            document.getElementById('expr-content').innerHTML = '<p class="text-center py-8 text-gray-500">Завантаження...</p>';
+            db.from('expressions').select('*').then(function(res) {
+                expressions = res.data || [];
+                showExprCategories();
+            });
+        }
+
+        function showExprCategories() {
+            currentExprCat = null;
+            document.getElementById('expr-back').classList.add('hidden');
+            document.getElementById('expr-title').textContent = 'Вирази';
+            
+            var cats = [...new Set(expressions.map(function(e) { return e.category; }))].filter(Boolean);
+            var html = '<div class="grid grid-cols-2 gap-3">';
+            cats.forEach(function(c) {
+                var cnt = expressions.filter(function(e) { return e.category === c; }).length;
+                html += '<div onclick="APP.showExprList(\'' + c.replace(/'/g, "\\'") + '\')" class="cursor-pointer bg-white rounded-xl p-4 shadow-sm">' +
+                    '<div class="text-2xl mb-2">' + (emojis[c] || '📝') + '</div>' +
+                    '<h3 class="font-semibold text-gray-800 text-sm">' + c + '</h3>' +
+                    '<p class="text-xs text-gray-500">' + cnt + ' виразів</p></div>';
+            });
+            html += '</div>';
+            document.getElementById('expr-content').innerHTML = html;
+        }
+
+        function showExprList(cat) {
+            currentExprCat = cat;
+            document.getElementById('expr-back').classList.remove('hidden');
+            document.getElementById('expr-title').textContent = cat;
+            searchExpr();
+        }
+
+        function searchExpr() {
+            if (!currentExprCat) return;
+            var q = document.getElementById('expr-search').value.toLowerCase();
+            var list = expressions.filter(function(e) {
+                return e.category === currentExprCat && 
+                    (e.dutch_expression.toLowerCase().includes(q) || e.ukrainian_translation.toLowerCase().includes(q));
+            });
+            var html = '<div class="space-y-3">';
+            list.forEach(function(e) {
+                html += '<div class="bg-white rounded-xl p-4 shadow-sm">' +
+                    '<div class="flex justify-between items-start">' +
+                    '<div><h3 class="font-semibold">' + e.dutch_expression + '</h3>' +
+                    '<p class="text-gray-600 mt-1">' + e.ukrainian_translation + '</p></div>' +
+                    '<button onclick="APP.speak(\'' + e.dutch_expression.replace(/'/g, "\\'") + '\')" class="p-2 bg-orange-100 rounded-full">🔊</button></div></div>';
+            });
+            html += '</div>';
+            document.getElementById('expr-content').innerHTML = html;
+        }
+
+        function backToExprCategories() { showExprCategories(); }
+
+        function loadPhrases() {
+            document.getElementById('phrase-content').innerHTML = '<p class="text-center py-8 text-gray-500">Завантаження...</p>';
+            db.from('phrasebook').select('*').then(function(res) {
+                phrases = res.data || [];
+                showPhraseCategories();
+            });
+        }
+
+        function showPhraseCategories() {
+            currentPhraseCat = null;
+            document.getElementById('phrase-back').classList.add('hidden');
+            document.getElementById('phrase-title').textContent = 'Розмовник';
+            
+            var cats = [...new Set(phrases.map(function(p) { return p.category; }))].filter(Boolean);
+            var html = '<div class="grid grid-cols-2 gap-3">';
+            cats.forEach(function(c) {
+                var cnt = phrases.filter(function(p) { return p.category === c; }).length;
+                html += '<div onclick="APP.showPhraseList(\'' + c.replace(/'/g, "\\'") + '\')" class="cursor-pointer bg-white rounded-xl p-4 shadow-sm">' +
+                    '<div class="text-2xl mb-2">' + (emojis[c] || '📝') + '</div>' +
+                    '<h3 class="font-semibold text-gray-800 text-sm">' + c + '</h3>' +
+                    '<p class="text-xs text-gray-500">' + cnt + ' фраз</p></div>';
+            });
+            html += '</div>';
+            document.getElementById('phrase-content').innerHTML = html;
+        }
+
+        function showPhraseList(cat) {
+            currentPhraseCat = cat;
+            document.getElementById('phrase-back').classList.remove('hidden');
+            document.getElementById('phrase-title').textContent = cat;
+            searchPhrase();
+        }
+
+        function searchPhrase() {
+            if (!currentPhraseCat) return;
+            var q = document.getElementById('phrase-search').value.toLowerCase();
+            var list = phrases.filter(function(p) {
+                return p.category === currentPhraseCat && 
+                    (p.ukrainian_phrase.toLowerCase().includes(q) || p.dutch_translation.toLowerCase().includes(q));
+            });
+            var html = '<div class="space-y-3">';
+            list.forEach(function(p) {
+                html += '<div class="bg-white rounded-xl p-4 shadow-sm">' +
+                    '<div class="flex justify-between items-start">' +
+                    '<div class="flex-1">' +
+                    '<p class="text-xs text-primary font-medium">🇺🇦 УКРАЇНСЬКА:</p>' +
+                    '<h3 class="font-semibold mt-1">' + p.ukrainian_phrase + '</h3>' +
+                    '<p class="text-xs text-primary font-medium mt-3">🇳🇱 НІДЕРЛАНДСЬКА:</p>' +
+                    '<p class="text-gray-700 mt-1">' + p.dutch_translation + '</p>' +
+                    (p.context ? '<p class="text-sm text-gray-500 mt-3 pt-3 border-t">💡 ' + p.context + '</p>' : '') +
+                    '</div>' +
+                    '<button onclick="APP.speak(\'' + p.dutch_translation.replace(/'/g, "\\'") + '\')" class="p-2 bg-orange-100 rounded-full ml-2">🔊</button></div></div>';
+            });
+            html += '</div>';
+            document.getElementById('phrase-content').innerHTML = html;
+        }
+
+        function backToPhraseCategories() { showPhraseCategories(); }
+
+        function goToCategory(cat) {
+            showTab('phrasebook');
+            setTimeout(function() {
+                if (phrases.length === 0) {
+                    db.from('phrasebook').select('*').then(function(res) {
+                        phrases = res.data || [];
+                        showPhraseList(cat);
+                    });
+                } else {
+                    showPhraseList(cat);
+                }
+            }, 100);
+        }
+
+        function speak(text) {
+            var u = new SpeechSynthesisUtterance(text);
+            u.lang = 'nl-NL';
+            speechSynthesis.speak(u);
+        }
+
+        // Init
+        loadDaily();
+
+        return {
+            showTab: showTab,
+            showExprList: showExprList,
+            searchExpr: searchExpr,
+            backToExprCategories: backToExprCategories,
+            showPhraseList: showPhraseList,
+            searchPhrase: searchPhrase,
+            backToPhraseCategories: backToPhraseCategories,
+            goToCategory: goToCategory,
+            speak: speak
+        };
+    })();
+    </script>
+</body>
+</html>
