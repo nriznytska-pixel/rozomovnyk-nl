@@ -27,6 +27,11 @@
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
+        .speaking { animation: pulse-orange 0.6s ease-in-out infinite; }
+        @keyframes pulse-orange {
+            0%, 100% { background-color: rgb(255 237 213); }
+            50% { background-color: rgb(255 186 120); }
+        }
     </style>
 </head>
 <body class="bg-cream min-h-screen pb-20">
@@ -156,15 +161,17 @@
 
     <script>
     var APP = (function() {
-        var db = window.supabase.createClient(
-            'https://akvfcemyrkadonbaghsf.supabase.co',
-            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFrdmZjZW15cmthZG9uYmFnaHNmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcyNjU4MTQsImV4cCI6MjA4Mjg0MTgxNH0.rxBWHMl8X8m3-U1gbGG-gX9gjPvnqUzBqWDI0a9RGiI'
-        );
+        var SUPABASE_URL = 'https://akvfcemyrkadonbaghsf.supabase.co';
+        var ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFrdmZjZW15cmthZG9uYmFnaHNmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcyNjU4MTQsImV4cCI6MjA4Mjg0MTgxNH0.rxBWHMl8X8m3-U1gbGG-gX9gjPvnqUzBqWDI0a9RGiI';
+        var AUDIO_BASE = SUPABASE_URL + '/storage/v1/object/public/audio';
+
+        var db = window.supabase.createClient(SUPABASE_URL, ANON_KEY);
         
         var expressions = [];
         var phrases = [];
         var currentExprCat = null;
         var currentPhraseCat = null;
+        var currentAudio = null;
         
         var emojis = {
             'Медицина': '🏥', 'Міграційна служба': '🛂', 'Кризова допомога': '🆘',
@@ -172,6 +179,55 @@
             'Освіта': '🎓', 'Образи та відповіді': '🛡️'
         };
 
+        // --- AUDIO PLAYBACK ---
+        function getAudioUrl(source, id) {
+            return AUDIO_BASE + '/' + source + '/' + id + '.mp3';
+        }
+
+        function speak(text, source, id) {
+            // Stop any currently playing audio
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio = null;
+            }
+
+            // Find the button that triggered this and animate it
+            var btnId = 'btn-' + source + '-' + id;
+            var btn = document.getElementById(btnId);
+
+            if (source && id) {
+                var url = getAudioUrl(source, id);
+                var audio = new Audio(url);
+                currentAudio = audio;
+
+                if (btn) btn.classList.add('speaking');
+
+                audio.onended = function() {
+                    currentAudio = null;
+                    if (btn) btn.classList.remove('speaking');
+                };
+                audio.onerror = function() {
+                    // Fallback to Web Speech API
+                    currentAudio = null;
+                    if (btn) btn.classList.remove('speaking');
+                    speakFallback(text);
+                };
+                audio.play().catch(function() {
+                    speakFallback(text);
+                    if (btn) btn.classList.remove('speaking');
+                });
+            } else {
+                speakFallback(text);
+            }
+        }
+
+        function speakFallback(text) {
+            var u = new SpeechSynthesisUtterance(text);
+            u.lang = 'nl-NL';
+            speechSynthesis.speak(u);
+        }
+
+        // --- TABS ---
         function showTab(name) {
             document.querySelectorAll('.tab-content').forEach(function(t) { t.classList.remove('active'); });
             document.getElementById(name + '-tab').classList.add('active');
@@ -191,6 +247,7 @@
             if (name === 'phrasebook' && phrases.length === 0) loadPhrases();
         }
 
+        // --- DAILY ---
         function loadDaily() {
             db.from('expressions').select('*').limit(50).then(function(res) {
                 if (res.data && res.data.length > 0) {
@@ -199,11 +256,12 @@
                         '<div class="flex justify-between items-start">' +
                         '<div><h3 class="text-lg font-semibold">' + r.dutch_expression + '</h3>' +
                         '<p class="text-gray-600 mt-1">' + r.ukrainian_translation + '</p></div>' +
-                        '<button onclick="APP.speak(\'' + r.dutch_expression.replace(/'/g, "\\'") + '\')" class="p-2 bg-orange-100 rounded-full">🔊</button></div>';
+                        '<button id="btn-expr-' + r.id + '" onclick="APP.speak(\'' + r.dutch_expression.replace(/'/g, "\\'") + '\', \'expr\', ' + r.id + ')" class="p-2 bg-orange-100 rounded-full flex-shrink-0">🔊</button></div>';
                 }
             });
         }
 
+        // --- EXPRESSIONS ---
         function loadExpressions() {
             document.getElementById('expr-content').innerHTML = '<p class="text-center py-8 text-gray-500">Завантаження...</p>';
             db.from('expressions').select('*').then(function(res) {
@@ -248,9 +306,9 @@
             list.forEach(function(e) {
                 html += '<div class="bg-white rounded-xl p-4 shadow-sm">' +
                     '<div class="flex justify-between items-start">' +
-                    '<div><h3 class="font-semibold">' + e.dutch_expression + '</h3>' +
+                    '<div class="flex-1"><h3 class="font-semibold">' + e.dutch_expression + '</h3>' +
                     '<p class="text-gray-600 mt-1">' + e.ukrainian_translation + '</p></div>' +
-                    '<button onclick="APP.speak(\'' + e.dutch_expression.replace(/'/g, "\\'") + '\')" class="p-2 bg-orange-100 rounded-full">🔊</button></div></div>';
+                    '<button id="btn-expr-' + e.id + '" onclick="APP.speak(\'' + e.dutch_expression.replace(/'/g, "\\'") + '\', \'expr\', ' + e.id + ')" class="p-2 bg-orange-100 rounded-full flex-shrink-0 ml-2">🔊</button></div></div>';
             });
             html += '</div>';
             document.getElementById('expr-content').innerHTML = html;
@@ -258,6 +316,7 @@
 
         function backToExprCategories() { showExprCategories(); }
 
+        // --- PHRASEBOOK ---
         function loadPhrases() {
             document.getElementById('phrase-content').innerHTML = '<p class="text-center py-8 text-gray-500">Завантаження...</p>';
             db.from('phrasebook').select('*').then(function(res) {
@@ -309,7 +368,7 @@
                     '<p class="text-gray-700 mt-1">' + p.dutch_translation + '</p>' +
                     (p.context ? '<p class="text-sm text-gray-500 mt-3 pt-3 border-t">💡 ' + p.context + '</p>' : '') +
                     '</div>' +
-                    '<button onclick="APP.speak(\'' + p.dutch_translation.replace(/'/g, "\\'") + '\')" class="p-2 bg-orange-100 rounded-full ml-2">🔊</button></div></div>';
+                    '<button id="btn-phrasebook-' + p.id + '" onclick="APP.speak(\'' + p.dutch_translation.replace(/'/g, "\\'") + '\', \'phrasebook\', ' + p.id + ')" class="p-2 bg-orange-100 rounded-full flex-shrink-0 ml-2">🔊</button></div></div>';
             });
             html += '</div>';
             document.getElementById('phrase-content').innerHTML = html;
@@ -329,12 +388,6 @@
                     showPhraseList(cat);
                 }
             }, 100);
-        }
-
-        function speak(text) {
-            var u = new SpeechSynthesisUtterance(text);
-            u.lang = 'nl-NL';
-            speechSynthesis.speak(u);
         }
 
         // Init
